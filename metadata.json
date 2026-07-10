@@ -1,0 +1,6 @@
+{
+  "name": "Ontological Typewriter",
+  "description": "A modular, distraction-free writing environment for Speculative Fiction with a Story Bible, Trash Draft mode, and thematic shifts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
