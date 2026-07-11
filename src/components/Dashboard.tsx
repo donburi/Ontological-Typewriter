@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ProjectData, Theme, THEME_UI } from '../types';
 import { Plus, Trash2, Download, BookOpen, Clock, Moon, Sun, Coffee, Settings } from 'lucide-react';
 
+import { UserAuth } from './UserAuth';
+
 interface DashboardProps {
   projects: ProjectData[];
   theme: Theme;
@@ -20,17 +22,22 @@ export function Dashboard({ projects, theme, onSelectProject, onAddProject, onDe
   
   const [settingsProject, setSettingsProject] = useState<ProjectData | null>(null);
   const [tempWordGoal, setTempWordGoal] = useState<string>('');
+  const [tempProjectTitle, setTempProjectTitle] = useState<string>('');
 
   const handleOpenSettings = (project: ProjectData, e: React.MouseEvent) => {
     e.stopPropagation();
     setSettingsProject(project);
     setTempWordGoal(project.wordGoal ? project.wordGoal.toString() : '');
+    setTempProjectTitle(project.title || '');
   };
 
   const handleSaveSettings = () => {
     if (settingsProject) {
       const goal = parseInt(tempWordGoal, 10);
-      onUpdateProject(settingsProject.id, { wordGoal: isNaN(goal) ? undefined : goal });
+      onUpdateProject(settingsProject.id, { 
+        wordGoal: isNaN(goal) ? undefined : goal,
+        title: tempProjectTitle.trim() || 'Untitled Project'
+      });
       setSettingsProject(null);
     }
   };
@@ -43,6 +50,7 @@ export function Dashboard({ projects, theme, onSelectProject, onAddProject, onDe
           <h1 className="text-xl font-serif font-semibold tracking-tight">Ontological Typewriter</h1>
         </div>
         <div className="flex items-center gap-4">
+          <UserAuth theme={theme} />
           <div className={`flex bg-black/5 rounded-lg p-1 border ${ui.panelBorder}`}>
             <button onClick={() => onChangeTheme('light')} className={`p-1.5 rounded-md transition-colors ${theme === 'light' ? 'bg-white shadow-sm text-black' : ui.textMuted}`}>
               <Sun className="w-4 h-4" />
@@ -149,6 +157,18 @@ export function Dashboard({ projects, theme, onSelectProject, onAddProject, onDe
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className={`${ui.panelBg} border ${ui.panelBorder} rounded-xl shadow-2xl p-6 w-full max-w-sm`}>
             <h2 className="text-xl font-serif font-bold mb-4">Project Settings</h2>
+            <div className="mb-4">
+              <label className={`block text-sm font-medium ${ui.textMuted} mb-2`}>
+                Project Title
+              </label>
+              <input
+                type="text"
+                value={tempProjectTitle}
+                onChange={(e) => setTempProjectTitle(e.target.value)}
+                placeholder="e.g. My Great Novel"
+                className={`w-full bg-black/5 border ${ui.panelBorder} rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-500 transition-colors`}
+              />
+            </div>
             <div className="mb-6">
               <label className={`block text-sm font-medium ${ui.textMuted} mb-2`}>
                 Daily Word Count Goal

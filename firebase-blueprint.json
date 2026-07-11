@@ -1,0 +1,14 @@
+{
+  "collections": [
+    {
+      "name": "workspaces",
+      "description": "Stores user workspace data",
+      "fields": [
+        { "name": "projects", "type": "array", "description": "Array of user projects" },
+        { "name": "theme", "type": "string", "description": "User UI theme preference" },
+        { "name": "activeProjectId", "type": "string", "description": "Currently active project ID" }
+      ]
+    }
+  ],
+  "relationships": []
+}

@@ -81,6 +81,13 @@ export function Sidebar({ books, activeView, onSelectView, onAddBook, onAddScene
                 >
                   <Plus className="w-3 h-3" />
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSelectView({ type: 'book', id: book.id }); }}
+                  className={`p-1 ${ui.highlight} ${activeView.type === 'book' && activeView.id === book.id ? 'text-indigo-500' : ''}`}
+                  title="Book Overview"
+                >
+                  <LayoutTemplate className="w-3 h-3" />
+                </button>
                 {books.length > 1 && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onDeleteBook(book.id); }}

@@ -1,40 +1,33 @@
 import { useState, useEffect } from 'react';
 import { WorkspaceData, ProjectData, createNewProject, Theme } from '../types';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const STORAGE_KEY = 'ontological-typewriter-workspace';
 const OLD_STORAGE_KEY = 'ontological-typewriter-data';
 
 export function useProjectData() {
+  const [user] = useAuthState(auth);
+  const [isLoaded, setIsLoaded] = useState(false);
+  
   const [workspace, setWorkspace] = useState<WorkspaceData>(() => {
+    // Initial local load for immediate render if logged out or while loading
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         let parsed = JSON.parse(stored);
-        
-        // Migrate workspace projects from scenes to books
         if (parsed.projects) {
           parsed.projects = parsed.projects.map((p: any) => {
             if (p.scenes && !p.books) {
-              return {
-                ...p,
-                books: [
-                  {
-                    id: crypto.randomUUID(),
-                    title: 'Book 1',
-                    scenes: p.scenes
-                  }
-                ],
-                scenes: undefined // remove old property
-              };
+              return { ...p, books: [{ id: crypto.randomUUID(), title: 'Book 1', scenes: p.scenes }],  };
             }
             return p;
           });
         }
-        
         return parsed;
       }
       
-      // Migration from old single-project state
       const oldStored = localStorage.getItem(OLD_STORAGE_KEY);
       if (oldStored) {
         const parsed = JSON.parse(oldStored);
@@ -43,40 +36,79 @@ export function useProjectData() {
           id: crypto.randomUUID(),
           lastModified: Date.now(),
           books: parsed.scenes ? [{ id: crypto.randomUUID(), title: 'Book 1', scenes: parsed.scenes }] : [],
-          scenes: undefined // remove if present
+          
         };
-        return {
-          projects: [migratedProject],
-          activeProjectId: null, // Start on dashboard
-          theme: 'dark'
-        };
+        return { projects: [migratedProject], activeProjectId: null, theme: 'dark' };
       }
     } catch (e) {
       console.error('Failed to load project data', e);
     }
-    return {
-      projects: [],
-      activeProjectId: null,
-      theme: 'dark'
-    };
+    return { projects: [], activeProjectId: null, theme: 'dark' };
   });
 
   const [lastSaved, setLastSaved] = useState<number>(Date.now());
 
+  // Load from Firestore when user logs in
   useEffect(() => {
+    if (user) {
+      const loadCloudData = async () => {
+        try {
+          const docRef = doc(db, 'workspaces', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const cloudData = docSnap.data() as WorkspaceData;
+            // Basic migration for cloud data as well
+            if (cloudData.projects) {
+              cloudData.projects = cloudData.projects.map((p: any) => {
+                if (p.scenes && !p.books) {
+                  return { ...p, books: [{ id: crypto.randomUUID(), title: 'Book 1', scenes: p.scenes }],  };
+                }
+                return p;
+              });
+            }
+            // Merge with local data? For simplicity, we just override with cloud data if it exists
+            // Or we could check lastModified. Let's just override with cloud data.
+            setWorkspace(cloudData);
+          } else {
+            // First time login, save local workspace to cloud
+            await setDoc(docRef, workspace);
+          }
+          setIsLoaded(true);
+        } catch (e) {
+          console.error("Failed to load from cloud", e);
+          setIsLoaded(true);
+        }
+      };
+      loadCloudData();
+    } else {
+      setIsLoaded(true);
+    }
+  }, [user]);
+
+  // Save changes to local and cloud
+  useEffect(() => {
+    if (!isLoaded) return; // Don't save initial state back immediately before loading cloud
+    
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
       setLastSaved(Date.now());
+      
+      if (user) {
+        const docRef = doc(db, 'workspaces', user.uid);
+        // We use a timeout to debounce slightly if needed, or just write directly.
+        // For now direct write since it's a simple app.
+        setDoc(docRef, workspace).catch(e => console.error('Cloud save failed', e));
+      }
     } catch (e) {
       console.error('Failed to save workspace data', e);
     }
-  }, [workspace]);
+  }, [workspace, user, isLoaded]);
 
   const updateActiveProject = (updates: Partial<ProjectData>) => {
     setWorkspace(prev => ({
       ...prev,
       projects: prev.projects.map(p => 
-        p.id === prev.activeProjectId ? { ...p, ...updates, lastModified: Date.now() } : p
+         p.id === prev.activeProjectId ? { ...p, ...updates, lastModified: Date.now() } : p
       )
     }));
   };
@@ -85,7 +117,7 @@ export function useProjectData() {
     setWorkspace(prev => ({
       ...prev,
       projects: prev.projects.map(p => 
-        p.id === id ? { ...p, ...updates, lastModified: Date.now() } : p
+         p.id === id ? { ...p, ...updates, lastModified: Date.now() } : p
       )
     }));
   };
@@ -121,13 +153,11 @@ export function useProjectData() {
   const importProjectJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const importedData = JSON.parse(event.target?.result as string);
         if (importedData) {
-          // migrate if old format
           let books = importedData.books || [];
           if (importedData.scenes && !importedData.books) {
             books = [{ id: crypto.randomUUID(), title: 'Book 1', scenes: importedData.scenes }];
@@ -136,8 +166,7 @@ export function useProjectData() {
           const newProject: ProjectData = {
             ...importedData,
             books,
-            scenes: undefined,
-            id: crypto.randomUUID(), // ensure unique id
+            id: crypto.randomUUID(),
             lastModified: Date.now()
           };
           setWorkspace(prev => ({

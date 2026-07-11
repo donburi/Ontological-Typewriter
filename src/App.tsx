@@ -6,12 +6,14 @@ import { OverviewEditor } from './components/OverviewEditor';
 import { StoryBible } from './components/StoryBible';
 import { Dashboard } from './components/Dashboard';
 import { Scene, VIBE_COLORS, THEME_UI, ProjectData, BookData } from './types';
-import { Book, Download, Upload, FileText, LayoutPanelLeft, Type, ArrowLeft, Search, Maximize } from 'lucide-react';
+import { Book, Download, Upload, FileText, LayoutPanelLeft, Type, ArrowLeft, Search, Maximize, LayoutTemplate } from 'lucide-react';
 
 export type ActiveView = 
   | { type: 'project' } 
   | { type: 'book', id: string } 
   | { type: 'scene', id: string, mode: 'draft' | 'overview' };
+
+import { UserAuth } from './components/UserAuth';
 
 export default function App() {
   const { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectJSON, exportMarkdown, lastSaved, setTheme, setActiveProjectId } = useProjectData();
@@ -211,9 +213,12 @@ export default function App() {
           subtitle="Project"
           content={activeProject.overview || ''}
           onUpdate={(content) => updateActiveProject({ overview: content })}
+          onUpdateTitle={(title) => updateActiveProject({ title })}
           theme={workspace.theme}
           editorFont={editorFont}
-        />
+          bible={activeProject.bible}
+          onAddToBible={handleAddToBible}
+          />
       );
     }
 
@@ -225,9 +230,12 @@ export default function App() {
           subtitle="Book"
           content={activeBook.overview || ''}
           onUpdate={(content) => handleUpdateBook(activeBook!.id, { overview: content })}
+          onUpdateTitle={(title) => handleUpdateBook(activeBook!.id, { title })}
           theme={workspace.theme}
           editorFont={editorFont}
-        />
+          bible={activeProject.bible}
+          onAddToBible={handleAddToBible}
+          />
       );
     }
 
@@ -240,9 +248,12 @@ export default function App() {
             subtitle="Scene"
             content={activeScene.overview || ''}
             onUpdate={(content) => handleUpdateScene({ overview: content })}
+          onUpdateTitle={(title) => handleUpdateScene({ title })}
             theme={workspace.theme}
             vibe={activeScene.vibe}
             editorFont={editorFont}
+          bible={activeProject.bible}
+          onAddToBible={handleAddToBible}
           />
         );
       }
@@ -259,7 +270,7 @@ export default function App() {
           editorFont={editorFont}
           theme={workspace.theme}
           bible={activeProject.bible}
-        />
+          />
       );
     }
 
@@ -286,9 +297,11 @@ export default function App() {
           </button>
           <button 
             onClick={() => setActiveView({ type: 'project' })}
-            className={`bg-transparent border-none outline-none text-sm font-semibold tracking-wide hover:underline cursor-pointer ${activeView.type === 'project' ? activeColors.text : ui.textMuted} truncate max-w-[200px] text-left`}
+            className={`bg-transparent border-none outline-none text-sm font-semibold tracking-wide hover:underline cursor-pointer ${activeView.type === 'project' ? activeColors.text : ui.textMuted} truncate max-w-[200px] text-left flex items-center gap-1.5`}
+            title="Project Overview"
           >
             {activeProject.title || "Untitled Project"}
+            <LayoutTemplate className={`w-3.5 h-3.5 ${activeView.type === 'project' ? 'text-indigo-500' : 'opacity-50'}`} />
           </button>
         </div>
 
@@ -339,6 +352,8 @@ export default function App() {
             <Book className="w-4 h-4" />
             Bible
           </button>
+          <div className={`w-px h-4 ${activeColors.border} mx-2`}></div>
+          <UserAuth theme={workspace.theme} />
         </div>
       </header>
       )}
@@ -378,37 +393,63 @@ export default function App() {
           onUpdateEntity={(id, updates) => {
             const newBible = activeProject.bible.map(e => e.id === id ? { ...e, ...updates } : e);
             let newBooks = activeProject.books;
+            let newProjectOverview = activeProject.overview;
             if (updates.name) {
               const oldEntity = activeProject.bible.find(e => e.id === id);
               if (oldEntity && oldEntity.name !== updates.name) {
+                const replaceStr = (str) => {
+                  if (!str) return str;
+                  return str.replace(/<span[^>]*data-bible-entity[^>]*>.*?<\/span>/g, (match) => {
+                    if (match.includes(`id="${id}"`)) {
+                      return `<span data-bible-entity="" id="${id}" name="${updates.name}">${updates.name}</span>`;
+                    }
+                    return match;
+                  });
+                };
+                
+                newProjectOverview = replaceStr(activeProject.overview);
+                
                 newBooks = activeProject.books.map(b => ({
                   ...b,
+                  overview: replaceStr(b.overview),
                   scenes: b.scenes.map(s => {
-                    const regex = new RegExp(`<span data-bible-entity="" id="${id}" name="[^"]*">[^<]*</span>`, 'g');
-                    const newHtml = `<span data-bible-entity="" id="${id}" name="${updates.name}">${updates.name}</span>`;
                     return {
                       ...s,
-                      content: s.content.replace(regex, newHtml)
+                      overview: replaceStr(s.overview),
+                      content: replaceStr(s.content)
                     };
                   })
                 }));
               }
             }
-            updateActiveProject({ bible: newBible, books: newBooks });
+            updateActiveProject({ bible: newBible, books: newBooks, overview: newProjectOverview });
           }}
           onDeleteEntity={(id) => {
             const newBible = activeProject.bible.filter(e => e.id !== id);
+            const replaceStr = (str) => {
+              if (!str) return str;
+              return str.replace(/<span[^>]*data-bible-entity[^>]*>(.*?)<\/span>/g, (match, inner) => {
+                if (match.includes(`id="${id}"`)) {
+                  return inner;
+                }
+                return match;
+              });
+            };
+            
+            const newProjectOverview = replaceStr(activeProject.overview);
+            
             const newBooks = activeProject.books.map(b => ({
               ...b,
+              overview: replaceStr(b.overview),
               scenes: b.scenes.map(s => {
-                const regex = new RegExp(`<span data-bible-entity="" id="${id}" name="([^"]*)">[^<]*</span>`, 'g');
                 return {
                   ...s,
-                  content: s.content.replace(regex, '$1') // replace with just the name
+                  overview: replaceStr(s.overview),
+                  content: replaceStr(s.content)
                 };
               })
             }));
-            updateActiveProject({ bible: newBible, books: newBooks });
+            updateActiveProject({ bible: newBible, books: newBooks, overview: newProjectOverview });
           }}
           initialNewEntityName={pendingBibleEntity}
           onClearInitialNewEntityName={() => setPendingBibleEntity(undefined)}

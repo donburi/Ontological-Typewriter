@@ -63,12 +63,6 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
     onUpdate: ({ editor }) => {
       updateScene({ content: editor.getHTML() });
 
-  useEffect(() => {
-    if (editor && bibleRef.current !== bible) {
-      bibleRef.current = bible;
-      editor.view.dispatch(editor.state.tr.setMeta("update-bible", true));
-    }
-  }, [bible, editor]);
 
     },
     onSelectionUpdate: ({ editor }) => {
