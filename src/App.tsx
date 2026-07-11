@@ -6,7 +6,7 @@ import { OverviewEditor } from './components/OverviewEditor';
 import { StoryBible } from './components/StoryBible';
 import { Dashboard } from './components/Dashboard';
 import { Scene, VIBE_COLORS, THEME_UI, ProjectData, BookData } from './types';
-import { Book, Download, Upload, FileText, LayoutPanelLeft, Type, ArrowLeft, Search, Maximize, LayoutTemplate } from 'lucide-react';
+import { Book, RefreshCw, Download, Upload, FileText, LayoutPanelLeft, Type, ArrowLeft, Search, Maximize, LayoutTemplate } from 'lucide-react';
 
 export type ActiveView = 
   | { type: 'project' } 
@@ -16,7 +16,7 @@ export type ActiveView =
 import { UserAuth } from './components/UserAuth';
 
 export default function App() {
-  const { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectJSON, exportMarkdown, lastSaved, setTheme, setActiveProjectId } = useProjectData();
+  const { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectJSON, exportMarkdown, lastSaved, setTheme, setActiveProjectId, syncWithCloud } = useProjectData();
   const [activeView, setActiveView] = useState<ActiveView>({ type: 'project' });
   const [isBibleOpen, setIsBibleOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -68,6 +68,7 @@ export default function App() {
         onExportProject={exportProjectJSON}
         onChangeTheme={setTheme}
         onImportProject={importProjectJSON}
+        onSyncWithCloud={syncWithCloud}
       />
     );
   }
@@ -333,6 +334,10 @@ export default function App() {
           </div>
           <div className={`w-px h-4 ${activeColors.border} mx-1`}></div>
           
+          <button onClick={() => syncWithCloud()} className={`${ui.textMuted} ${ui.highlight} transition-colors flex items-center gap-1.5`} title="Sync Offline Changes to Cloud">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <div className={`w-px h-4 ${activeColors.border} mx-1`}></div>
           <button onClick={() => exportProjectJSON(activeProject)} className={`${ui.textMuted} ${ui.highlight} transition-colors`} title="Export JSON">
             <Download className="w-4 h-4" />
           </button>

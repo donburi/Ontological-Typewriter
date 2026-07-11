@@ -8,8 +8,9 @@ const STORAGE_KEY = 'ontological-typewriter-workspace';
 const OLD_STORAGE_KEY = 'ontological-typewriter-data';
 
 export function useProjectData() {
-  const [user] = useAuthState(auth);
+  const [user, authLoading] = useAuthState(auth);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [currentUserUid, setCurrentUserUid] = useState<string | null | undefined>(undefined);
   
   const [workspace, setWorkspace] = useState<WorkspaceData>(() => {
     // Initial local load for immediate render if logged out or while loading
@@ -50,7 +51,13 @@ export function useProjectData() {
 
   // Load from Firestore when user logs in
   useEffect(() => {
+    if (authLoading) return; // Wait until auth state is resolved
+
     if (user) {
+      if (currentUserUid === user.uid) return; // Already loaded for this user
+      
+      setIsLoaded(false); // Prevent saving while loading
+      
       const loadCloudData = async () => {
         try {
           const docRef = doc(db, 'workspaces', user.uid);
@@ -61,33 +68,57 @@ export function useProjectData() {
             if (cloudData.projects) {
               cloudData.projects = cloudData.projects.map((p: any) => {
                 if (p.scenes && !p.books) {
-                  return { ...p, books: [{ id: crypto.randomUUID(), title: 'Book 1', scenes: p.scenes }],  };
+                  return { ...p, books: [{ id: crypto.randomUUID(), title: 'Book 1', scenes: p.scenes }]  };
                 }
                 return p;
               });
             }
-            // Merge with local data? For simplicity, we just override with cloud data if it exists
-            // Or we could check lastModified. Let's just override with cloud data.
-            setWorkspace(cloudData);
+            
+            setWorkspace(prevWorkspace => {
+              const mergedProjects = new Map<string, ProjectData>();
+              prevWorkspace.projects.forEach(p => mergedProjects.set(p.id, p));
+              (cloudData.projects || []).forEach(cp => {
+                const lp = mergedProjects.get(cp.id);
+                if (!lp || (cp.lastModified > lp.lastModified)) {
+                  mergedProjects.set(cp.id, cp);
+                }
+              });
+
+              const mergedWorkspace: WorkspaceData = {
+                ...cloudData,
+                theme: prevWorkspace.theme,
+                projects: Array.from(mergedProjects.values()).sort((a, b) => b.lastModified - a.lastModified),
+                activeProjectId: prevWorkspace.activeProjectId || cloudData.activeProjectId,
+              };
+              
+              setDoc(docRef, JSON.parse(JSON.stringify(mergedWorkspace))).catch(e => console.error('Failed to sync merged data', e));
+              return mergedWorkspace;
+            });
           } else {
             // First time login, save local workspace to cloud
-            await setDoc(docRef, workspace);
+            await setDoc(docRef, JSON.parse(JSON.stringify(workspace)));
           }
+          setCurrentUserUid(user.uid);
           setIsLoaded(true);
         } catch (e) {
           console.error("Failed to load from cloud", e);
+          setCurrentUserUid(user.uid);
           setIsLoaded(true);
         }
       };
       loadCloudData();
     } else {
+      if (currentUserUid !== null) {
+        setCurrentUserUid(null);
+      }
       setIsLoaded(true);
     }
-  }, [user]);
+  }, [user, authLoading, currentUserUid]);
 
   // Save changes to local and cloud
   useEffect(() => {
     if (!isLoaded) return; // Don't save initial state back immediately before loading cloud
+    if (user && currentUserUid !== user.uid) return; // Don't save if cloud data hasn't been loaded for this user yet
     
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
@@ -97,12 +128,62 @@ export function useProjectData() {
         const docRef = doc(db, 'workspaces', user.uid);
         // We use a timeout to debounce slightly if needed, or just write directly.
         // For now direct write since it's a simple app.
-        setDoc(docRef, workspace).catch(e => console.error('Cloud save failed', e));
+        setDoc(docRef, JSON.parse(JSON.stringify(workspace))).catch(e => console.error('Cloud save failed', e));
       }
     } catch (e) {
       console.error('Failed to save workspace data', e);
     }
-  }, [workspace, user, isLoaded]);
+  }, [workspace, user, isLoaded, currentUserUid]);
+
+  const syncWithCloud = async () => {
+    if (!user) {
+      alert("Please log in to sync data with the cloud.");
+      return;
+    }
+    try {
+      const docRef = doc(db, 'workspaces', user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const cloudData = docSnap.data() as WorkspaceData;
+        if (cloudData.projects) {
+          cloudData.projects = cloudData.projects.map((p: any) => {
+            if (p.scenes && !p.books) {
+              return { ...p, books: [{ id: crypto.randomUUID(), title: 'Book 1', scenes: p.scenes }]  };
+            }
+            return p;
+          });
+        }
+        
+        setWorkspace(prevWorkspace => {
+          const mergedProjects = new Map<string, ProjectData>();
+          prevWorkspace.projects.forEach(p => mergedProjects.set(p.id, p));
+          (cloudData.projects || []).forEach(cp => {
+            const lp = mergedProjects.get(cp.id);
+            if (!lp || (cp.lastModified > lp.lastModified)) {
+              mergedProjects.set(cp.id, cp);
+            }
+          });
+
+          const mergedWorkspace: WorkspaceData = {
+            ...cloudData,
+            theme: prevWorkspace.theme,
+            projects: Array.from(mergedProjects.values()).sort((a, b) => b.lastModified - a.lastModified),
+            activeProjectId: prevWorkspace.activeProjectId || cloudData.activeProjectId,
+          };
+          
+          setDoc(docRef, JSON.parse(JSON.stringify(mergedWorkspace))).catch(e => console.error('Failed to sync merged data', e));
+          return mergedWorkspace;
+        });
+        alert('Successfully synced with cloud!');
+      } else {
+        await setDoc(docRef, JSON.parse(JSON.stringify(workspace)));
+        alert('Successfully uploaded local data to cloud!');
+      }
+    } catch (e) {
+      console.error('Manual sync failed', e);
+      alert('Failed to sync with cloud. Please try again.');
+    }
+  };
 
   const updateActiveProject = (updates: Partial<ProjectData>) => {
     setWorkspace(prev => ({
@@ -210,5 +291,5 @@ export function useProjectData() {
   const setTheme = (theme: Theme) => setWorkspace(prev => ({ ...prev, theme }));
   const setActiveProjectId = (id: string | null) => setWorkspace(prev => ({ ...prev, activeProjectId: id }));
 
-  return { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectJSON, exportMarkdown, lastSaved, setTheme, setActiveProjectId };
+  return { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectJSON, exportMarkdown, lastSaved, setTheme, setActiveProjectId, syncWithCloud };
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProjectData, Theme, THEME_UI } from '../types';
-import { Plus, Trash2, Download, BookOpen, Clock, Moon, Sun, Coffee, Settings } from 'lucide-react';
+import { Plus, Trash2, Download, BookOpen, Clock, Moon, Sun, Coffee, Settings, RefreshCw } from 'lucide-react';
 
 import { UserAuth } from './UserAuth';
 
@@ -14,9 +14,10 @@ interface DashboardProps {
   onExportProject: (project: ProjectData) => void;
   onChangeTheme: (theme: Theme) => void;
   onImportProject: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSyncWithCloud?: () => void;
 }
 
-export function Dashboard({ projects, theme, onSelectProject, onAddProject, onDeleteProject, onUpdateProject, onExportProject, onChangeTheme, onImportProject }: DashboardProps) {
+export function Dashboard({ projects, theme, onSelectProject, onAddProject, onDeleteProject, onUpdateProject, onExportProject, onChangeTheme, onImportProject, onSyncWithCloud }: DashboardProps) {
   const ui = THEME_UI[theme];
   const sortedProjects = [...projects].sort((a, b) => b.lastModified - a.lastModified);
   
@@ -62,6 +63,12 @@ export function Dashboard({ projects, theme, onSelectProject, onAddProject, onDe
               <Moon className="w-4 h-4" />
             </button>
           </div>
+          {onSyncWithCloud && (
+            <button onClick={onSyncWithCloud} className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border ${ui.panelBorder} rounded-lg ${ui.hoverBg} transition-colors`}>
+              <RefreshCw className="w-4 h-4" />
+              Sync
+            </button>
+          )}
           <label className={`cursor-pointer px-4 py-2 text-sm font-medium border ${ui.panelBorder} rounded-lg ${ui.hoverBg} transition-colors`}>
             Import JSON
             <input type="file" accept=".json" onChange={onImportProject} className="hidden" />
