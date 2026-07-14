@@ -110,6 +110,13 @@ export function OverviewEditor({ title, subtitle, content, onUpdate, onUpdateTit
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   };
 
+  
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content);
+    }
+  }, [content, editor]);
+
   return (
     <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-black/5">
       <div className={`p-8 pb-4 border-b ${colors.border}`}>

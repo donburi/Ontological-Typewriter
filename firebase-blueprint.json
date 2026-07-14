@@ -1,14 +1,41 @@
 {
-  "collections": [
-    {
-      "name": "workspaces",
-      "description": "Stores user workspace data",
-      "fields": [
-        { "name": "projects", "type": "array", "description": "Array of user projects" },
-        { "name": "theme", "type": "string", "description": "User UI theme preference" },
-        { "name": "activeProjectId", "type": "string", "description": "Currently active project ID" }
-      ]
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "lastLoginAt": { "type": "number" }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "User feedback",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "message", "createdAt"]
     }
-  ],
-  "relationships": []
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered users"
+    },
+    "feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/Feedback" },
+      "description": "Feedback messages"
+    },
+    "workspaces/{userId}": {
+      "schema": "legacy",
+      "description": "Stores user workspace data"
+    }
+  }
 }

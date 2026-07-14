@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuthState, useSignInWithGoogle } from 'react-firebase-hooks/auth';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { LogIn, LogOut, User } from 'lucide-react';
 import { THEME_UI, Theme } from '../types';
 
@@ -12,6 +13,32 @@ export function UserAuth({ theme }: UserAuthProps) {
   const [user, loading, error] = useAuthState(auth);
   const [signInWithGoogle, , , authError] = useSignInWithGoogle(auth);
   const ui = THEME_UI[theme];
+
+  React.useEffect(() => {
+    const saveUser = async () => {
+      if (user) {
+        const userRef = doc(db, 'users', user.uid);
+        try {
+          const docSnap = await getDoc(userRef);
+          if (docSnap.exists()) {
+            await updateDoc(userRef, {
+              lastLoginAt: Date.now()
+            });
+          } else {
+            await setDoc(userRef, {
+              email: user.email,
+              createdAt: Date.now(),
+              lastLoginAt: Date.now()
+            });
+          }
+        } catch (err) {
+          console.error("Error saving user profile", err);
+        }
+      }
+    };
+    saveUser();
+  }, [user]);
+
 
   const handleSignIn = () => {
     signInWithGoogle();

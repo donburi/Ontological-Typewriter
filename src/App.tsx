@@ -13,6 +13,11 @@ export type ActiveView =
   | { type: 'book', id: string } 
   | { type: 'scene', id: string, mode: 'draft' | 'overview' };
 
+import { AdminPanel } from './components/AdminPanel';
+import { FeedbackModal } from './components/FeedbackModal';
+import { auth } from './lib/firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { Shield, MessageSquare } from 'lucide-react';
 import { UserAuth } from './components/UserAuth';
 
 export default function App() {
@@ -26,6 +31,11 @@ export default function App() {
   const [editorFont, setEditorFont] = useState<string>('font-serif');
   const [sceneSearchQuery, setSceneSearchQuery] = useState('');
   const [isDistractionFree, setIsDistractionFree] = useState(false);
+
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [user] = useAuthState(auth);
+
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -350,6 +360,21 @@ export default function App() {
             <Maximize className="w-4 h-4" />
           </button>
           <div className={`w-px h-4 ${activeColors.border} mx-1`}></div>
+          
+          <button onClick={() => setIsFeedbackOpen(true)} className={`${ui.textMuted} ${ui.highlight} transition-colors flex items-center gap-1.5`} title="Send Feedback">
+            <MessageSquare className="w-4 h-4" />
+          </button>
+          <div className={`w-px h-4 ${activeColors.border} mx-1`}></div>
+          
+          {user?.email === 'procyin@gmail.com' && (
+            <>
+              <button onClick={() => setIsAdminOpen(true)} className={`${ui.textMuted} ${ui.highlight} transition-colors flex items-center gap-1.5`} title="Admin Panel">
+                <Shield className="w-4 h-4" />
+              </button>
+              <div className={`w-px h-4 ${activeColors.border} mx-1`}></div>
+            </>
+          )}
+
           <button 
             onClick={() => setIsBibleOpen(!isBibleOpen)} 
             className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-md transition-colors ${isBibleOpen ? `${ui.textMain} font-medium ${ui.activeBg}` : `${ui.textMuted} ${ui.highlight} ${ui.hoverBg}`}`}
@@ -461,7 +486,14 @@ export default function App() {
           selectedEntityId={selectedBibleEntityId}
           theme={workspace.theme}
         />
-      </div>
+            </div>
+
+      {isAdminOpen && (
+        <AdminPanel theme={workspace.theme} onClose={() => setIsAdminOpen(false)} />
+      )}
+      {isFeedbackOpen && (
+        <FeedbackModal theme={workspace.theme} onClose={() => setIsFeedbackOpen(false)} />
+      )}
     </div>
   );
 }

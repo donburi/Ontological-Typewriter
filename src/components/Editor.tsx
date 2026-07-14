@@ -124,6 +124,13 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
     return () => clearInterval(interval);
   }, [isTrashDraftMode, timeLeft]);
 
+  
+  useEffect(() => {
+    if (editor && scene.content !== editor.getHTML()) {
+      editor.commands.setContent(scene.content);
+    }
+  }, [scene.content, editor]);
+
   const startTrashDraft = () => {
     setIsTrashDraftMode(true);
     setTimeLeft(15 * 60);

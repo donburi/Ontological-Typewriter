@@ -99,17 +99,25 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
     setEditingId(null);
   };
 
-  const getOccurrences = (entityId: string) => {
-    const occurrences: { bookTitle: string, scene: Scene }[] = [];
+  const escapeRegExp = (string: string) => {
+    return string.replace(/[.*+?^${()|[\]\\]/g, '\\$&');
+  };
+  const getOccurrences = (entity: Entity) => {
+    const occurrences: { bookTitle: string, scene: any, count: number }[] = [];
     project.books.forEach(book => {
       book.scenes.forEach(scene => {
-        if (scene.content.includes(entityId)) {
-          occurrences.push({ bookTitle: book.title, scene });
+        if (!scene.content) return;
+        const stripped = scene.content.replace(/<[^>]*>?/gm, '');
+        const regex = new RegExp(`\\b(${escapeRegExp(entity.name)})\\b`, 'gi');
+        const matches = [...stripped.matchAll(regex)];
+        if (matches.length > 0) {
+          occurrences.push({ bookTitle: book.title, scene, count: matches.length });
         }
       });
     });
     return occurrences;
   };
+
 
   const filteredBible = bible.filter(e => 
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -122,7 +130,7 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
        const r = 100;
        const x = 150 + r * Math.cos(angle);
        const y = 150 + r * Math.sin(angle);
-       const occ = getOccurrences(entity.id).length;
+       const occ = getOccurrences(entity).reduce((acc, curr) => acc + curr.count, 0);
        return { ...entity, x, y, size: occ * 20 + 40, occurrencesCount: occ };
     });
 
@@ -308,7 +316,7 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
                   );
                 }
 
-                const occurrences = getOccurrences(entity.id);
+                const occurrences = getOccurrences(entity);
                 const linkedEntities = (entity.linkedEntityIds || []).map(id => bible.find(e => e.id === id)).filter(Boolean) as Entity[];
 
                 return (
@@ -347,9 +355,12 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
                         <h4 className={`text-[10px] font-semibold uppercase tracking-wider ${ui.textMuted} mb-1.5 flex items-center gap-1`}><FileText className="w-3 h-3" /> Occurrences</h4>
                         <ul className="space-y-1">
                           {occurrences.map((occ, idx) => (
-                            <li key={idx} className={`text-[10px] ${ui.textMuted} truncate`}>
-                              <span className="opacity-60">{occ.bookTitle} &rarr; </span> 
-                              <span className="font-medium">{occ.scene.title}</span>
+                            <li key={idx} className={`text-[10px] ${ui.textMuted} truncate flex justify-between`}>
+                              <span>
+                                <span className="opacity-60">{occ.bookTitle} &rarr; </span> 
+                                <span className="font-medium">{occ.scene.title}</span>
+                              </span>
+                              <span className="opacity-50">×{occ.count}</span>
                             </li>
                           ))}
                         </ul>
