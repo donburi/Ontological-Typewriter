@@ -16,7 +16,7 @@ export type ActiveView =
 import { UserAuth } from './components/UserAuth';
 
 export default function App() {
-  const { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectJSON, exportMarkdown, lastSaved, setTheme, setActiveProjectId, syncWithCloud } = useProjectData();
+  const { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectFile, exportMarkdown, lastSaved, setTheme, setActiveProjectId, syncWithCloud } = useProjectData();
   const [activeView, setActiveView] = useState<ActiveView>({ type: 'project' });
   const [isBibleOpen, setIsBibleOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -67,7 +67,7 @@ export default function App() {
         onUpdateProject={updateProject}
         onExportProject={exportProjectJSON}
         onChangeTheme={setTheme}
-        onImportProject={importProjectJSON}
+        onImportProject={importProjectFile}
         onSyncWithCloud={syncWithCloud}
       />
     );

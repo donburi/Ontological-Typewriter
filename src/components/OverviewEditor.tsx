@@ -198,7 +198,7 @@ export function OverviewEditor({ title, subtitle, content, onUpdate, onUpdateTit
         </div>
       )}
 
-      <div className="flex-1 relative p-8 max-w-4xl w-full overflow-y-auto">
+      <div className="flex-1 relative p-8 max-w-none w-full overflow-y-auto">
         <EditorContent editor={editor} className={`w-full h-full prose-editor outline-none text-lg leading-relaxed ${editorFont} ${colors.editorText} selection:bg-indigo-500/30`} />
         {showTooltip && (
           <div

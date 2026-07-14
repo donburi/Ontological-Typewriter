@@ -231,32 +231,143 @@ export function useProjectData() {
     URL.revokeObjectURL(url);
   };
 
-  const importProjectJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+  
+  const importProjectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (!result) return;
+
       try {
-        const importedData = JSON.parse(event.target?.result as string);
-        if (importedData) {
-          let books = importedData.books || [];
-          if (importedData.scenes && !importedData.books) {
-            books = [{ id: crypto.randomUUID(), title: 'Book 1', scenes: importedData.scenes }];
+        if (file.name.endsWith('.json')) {
+          const importedData = JSON.parse(result);
+          if (importedData) {
+            let books = importedData.books || [];
+            if (importedData.scenes && !importedData.books) {
+              books = [{ id: crypto.randomUUID(), title: 'Book 1', scenes: importedData.scenes }];
+            }
+            
+            const newProject: ProjectData = {
+              ...importedData,
+              books,
+              id: crypto.randomUUID(),
+              lastModified: Date.now()
+            };
+            setWorkspace(prev => ({
+              ...prev,
+              projects: [newProject, ...prev.projects]
+            }));
           }
-          
+        } else if (file.name.endsWith('.md')) {
+          const lines = result.split('\n');
           const newProject: ProjectData = {
-            ...importedData,
-            books,
             id: crypto.randomUUID(),
-            lastModified: Date.now()
+            title: 'Imported Project',
+            lastModified: Date.now(),
+            books: [],
+            bible: []
           };
+
+          let projectTitleSet = false;
+          let currentBook: any = null;
+          let currentScene: any = null;
+          let currentEntity: any = null;
+          let inStoryBible = false;
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            if (line.trim() === '# Story Bible') {
+              inStoryBible = true;
+              currentScene = null;
+              currentBook = null;
+              continue;
+            }
+
+            if (inStoryBible) {
+              if (line.startsWith('### ')) {
+                const match = line.match(/^###\s+(.+?)(?:\s+\((.+?)\))?$/);
+                if (match) {
+                  currentEntity = {
+                    id: crypto.randomUUID(),
+                    name: match[1].trim(),
+                    type: (match[2]?.trim()) || 'Character',
+                    description: ''
+                  };
+                  newProject.bible.push(currentEntity);
+                }
+              } else if (currentEntity) {
+                if (currentEntity.description) {
+                  currentEntity.description += '\n' + line;
+                } else {
+                  if (line.trim() !== '') {
+                    currentEntity.description = line;
+                  }
+                }
+              }
+            } else {
+              if (line.startsWith('# ')) {
+                const title = line.substring(2).trim();
+                if (!projectTitleSet) {
+                  newProject.title = title;
+                  projectTitleSet = true;
+                } else {
+                  currentBook = {
+                    id: crypto.randomUUID(),
+                    title: title,
+                    scenes: []
+                  };
+                  newProject.books.push(currentBook);
+                  currentScene = null;
+                }
+              } else if (line.startsWith('## ')) {
+                const title = line.substring(3).trim();
+                currentScene = {
+                  id: crypto.randomUUID(),
+                  title: title,
+                  content: '',
+                  vibe: 'Neutral'
+                };
+                if (!currentBook) {
+                  currentBook = {
+                    id: crypto.randomUUID(),
+                    title: 'Imported Book',
+                    scenes: []
+                  };
+                  newProject.books.push(currentBook);
+                }
+                currentBook.scenes.push(currentScene);
+              } else if (currentScene) {
+                if (currentScene.content === '' && line.trim() === '') {
+                  continue;
+                }
+                if (currentScene.content !== '') {
+                  currentScene.content += '\n' + line;
+                } else {
+                  currentScene.content = line;
+                }
+              }
+            }
+          }
+
+          newProject.books.forEach(b => {
+            b.scenes.forEach(s => {
+              s.content = s.content.trimEnd();
+            });
+          });
+
           setWorkspace(prev => ({
             ...prev,
             projects: [newProject, ...prev.projects]
           }));
+        } else {
+           alert('Unsupported file type. Please upload a .json or .md file.');
         }
       } catch (err) {
-        alert('Invalid JSON file.');
+        alert('Failed to parse file.');
       }
     };
     reader.readAsText(file);
@@ -291,5 +402,5 @@ export function useProjectData() {
   const setTheme = (theme: Theme) => setWorkspace(prev => ({ ...prev, theme }));
   const setActiveProjectId = (id: string | null) => setWorkspace(prev => ({ ...prev, activeProjectId: id }));
 
-  return { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectJSON, exportMarkdown, lastSaved, setTheme, setActiveProjectId, syncWithCloud };
+  return { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectFile, exportMarkdown, lastSaved, setTheme, setActiveProjectId, syncWithCloud };
 }
