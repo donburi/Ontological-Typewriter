@@ -23,12 +23,16 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState<EntityType>('Character');
   const [newDesc, setNewDesc] = useState('');
   const [newLinkedIds, setNewLinkedIds] = useState<string[]>([]);
   
   const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
+  const [sortBy, setSortBy] = useState<'name' | 'type' | 'lastModified'>('name');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
 
   const entityRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -59,12 +63,15 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
 
   const handleSaveNew = () => {
     if (!newName.trim()) return;
+
     onAddEntity({
       name: newName.trim(),
       type: newType,
       description: newDesc.trim(),
-      linkedEntityIds: newLinkedIds
+      linkedEntityIds: newLinkedIds,
+      lastModified: Date.now()
     });
+
     setIsAdding(false);
     setNewName('');
     setNewDesc('');
@@ -90,12 +97,15 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
   
   const handleSaveEdit = () => {
     if (!editingId || !newName.trim()) return;
+
     onUpdateEntity(editingId, {
       name: newName.trim(),
       type: newType,
       description: newDesc.trim(),
-      linkedEntityIds: newLinkedIds
+      linkedEntityIds: newLinkedIds,
+      lastModified: Date.now()
     });
+
     setEditingId(null);
   };
 
@@ -119,10 +129,21 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
   };
 
 
-  const filteredBible = bible.filter(e => 
-    e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    e.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
+  const filteredBible = useMemo(() => {
+    let filtered = bible.filter(e => 
+      e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      e.description.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    filtered.sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'type') return a.type.localeCompare(b.type);
+      if (sortBy === 'lastModified') return (b.lastModified || 0) - (a.lastModified || 0);
+      return 0;
+    });
+    return filtered;
+  }, [bible, searchTerm, sortBy]);
+
 
   const graphData = useMemo(() => {
     const nodes = bible.map((entity, i) => {
@@ -180,7 +201,8 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
           <div className="w-[320px] flex-1 overflow-y-auto flex flex-col">
             {viewMode === 'list' ? (
               <>
-                <div className="p-4 pb-0 shrink-0">
+
+                <div className="p-4 pb-0 shrink-0 space-y-2">
                   <div className="relative">
                     <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${ui.textMuted}`} />
                     <input
@@ -191,7 +213,20 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
                       className={`w-full ${ui.inputBg} border ${ui.panelBorder} rounded-md py-1.5 pl-9 pr-3 text-sm ${ui.textMain} outline-none focus:border-indigo-500 transition-colors`}
                     />
                   </div>
+                  <div className="flex justify-end items-center">
+                    <label className={`text-xs ${ui.textMuted} mr-2`}>Sort by:</label>
+                    <select 
+                      value={sortBy} 
+                      onChange={e => setSortBy(e.target.value as any)}
+                      className={`bg-transparent text-xs ${ui.textMain} outline-none border-b ${ui.panelBorder}`}
+                    >
+                      <option value="name">Name</option>
+                      <option value="type">Category</option>
+                      <option value="lastModified">Last Modified</option>
+                    </select>
+                  </div>
                 </div>
+
 
                 <div className="p-4 flex-1 overflow-y-auto space-y-4">
                   {isAdding && (
@@ -318,15 +353,17 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
 
                 const occurrences = getOccurrences(entity);
                 const linkedEntities = (entity.linkedEntityIds || []).map(id => bible.find(e => e.id === id)).filter(Boolean) as Entity[];
+                const isExpanded = expandedId === entity.id;
 
                 return (
                   <div 
                     key={entity.id} 
                     ref={el => { entityRefs.current[entity.id] = el; }}
-                    className={`${ui.inputBg} border ${selectedEntityId === entity.id ? 'border-indigo-500 shadow-md' : ui.panelBorder} rounded-lg p-3 group relative transition-all`}
+                    onClick={() => setExpandedId(isExpanded ? null : entity.id)}
+                    className={`${ui.inputBg} border ${selectedEntityId === entity.id ? 'border-indigo-500 shadow-md' : ui.panelBorder} rounded-lg p-3 group relative transition-all cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-800`}
                   >
                      <button 
-                        onClick={() => startEditing(entity)}
+                        onClick={(e) => { e.stopPropagation(); startEditing(entity); }}
                         className={`absolute top-2 right-2 ${ui.textMuted} hover:${ui.textMain} opacity-0 group-hover:opacity-100 transition-opacity`}
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -335,39 +372,45 @@ export function StoryBible({ project, bible, onAddEntity, onUpdateEntity, onDele
                       <span className={`text-[10px] px-1.5 py-0.5 rounded bg-black/10 ${ui.textMuted} font-mono uppercase tracking-tight`}>{entity.type}</span>
                       <h3 className={`text-sm font-semibold ${ui.textMain} truncate pr-6`}>{entity.name}</h3>
                     </div>
-                    <p className={`text-xs ${ui.textMuted} leading-relaxed whitespace-pre-wrap mt-2`}>{entity.description || 'No description provided.'}</p>
                     
-                    {linkedEntities.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className={`text-[10px] font-semibold uppercase tracking-wider ${ui.textMuted} mb-1.5 flex items-center gap-1`}><LinkIcon className="w-3 h-3" /> Linked</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {linkedEntities.map(linked => (
-                            <span key={linked.id} className={`px-1.5 py-0.5 rounded bg-black/5 text-[10px] ${ui.textMuted}`}>
-                              {linked.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {isExpanded && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="overflow-hidden">
+                        <p className={`text-xs ${ui.textMuted} leading-relaxed whitespace-pre-wrap mt-2`}>{entity.description || 'No description provided.'}</p>
+                        
+                        {linkedEntities.length > 0 && (
+                          <div className="mt-3">
+                            <h4 className={`text-[10px] font-semibold uppercase tracking-wider ${ui.textMuted} mb-1.5 flex items-center gap-1`}><LinkIcon className="w-3 h-3" /> Linked</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {linkedEntities.map(linked => (
+                                <span key={linked.id} className={`px-1.5 py-0.5 rounded bg-black/5 text-[10px] ${ui.textMuted}`}>
+                                  {linked.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
-                    {occurrences.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className={`text-[10px] font-semibold uppercase tracking-wider ${ui.textMuted} mb-1.5 flex items-center gap-1`}><FileText className="w-3 h-3" /> Occurrences</h4>
-                        <ul className="space-y-1">
-                          {occurrences.map((occ, idx) => (
-                            <li key={idx} className={`text-[10px] ${ui.textMuted} truncate flex justify-between`}>
-                              <span>
-                                <span className="opacity-60">{occ.bookTitle} &rarr; </span> 
-                                <span className="font-medium">{occ.scene.title}</span>
-                              </span>
-                              <span className="opacity-50">×{occ.count}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                        {occurrences.length > 0 && (
+                          <div className="mt-3">
+                            <h4 className={`text-[10px] font-semibold uppercase tracking-wider ${ui.textMuted} mb-1.5 flex items-center gap-1`}><FileText className="w-3 h-3" /> Occurrences</h4>
+                            <ul className="space-y-1">
+                              {occurrences.map((occ, idx) => (
+                                <li key={idx} className={`text-[10px] ${ui.textMuted} truncate flex justify-between`}>
+                                  <span>
+                                    <span className="opacity-60">{occ.bookTitle} &rarr; </span> 
+                                    <span className="font-medium">{occ.scene.title}</span>
+                                  </span>
+                                  <span className="opacity-50">×{occ.count}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </motion.div>
                     )}
                   </div>
                 );
+
               })}
             </div>
               </>

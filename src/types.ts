@@ -6,6 +6,7 @@ export interface Entity {
   type: EntityType;
   description: string;
   linkedEntityIds?: string[];
+  lastModified?: number;
 }
 
 export type Vibe = 'Neutral' | 'Melancholic Whimsy' | 'Anxious/Overwhelmed' | 'Calm/Integrated';
@@ -41,6 +42,9 @@ export interface WritingSession {
 export interface ProjectData {
   id: string;
   title: string;
+  author?: string;
+  epubDescription?: string;
+  generateTOC?: boolean;
   overview?: string;
   books: BookData[];
   bible: Entity[];
@@ -110,3 +114,8 @@ export const createNewProject = (): ProjectData => ({
   ],
   bible: []
 });
+
+export type ActiveView = 
+  | { type: 'project' }
+  | { type: 'book'; id: string }
+  | { type: 'scene'; id: string; mode: 'draft' | 'overview' };

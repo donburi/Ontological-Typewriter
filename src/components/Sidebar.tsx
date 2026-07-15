@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Scene, Vibe, Theme, THEME_UI, BookData } from '../types';
 import { Plus, Settings2, Trash2, Play, Square, ChevronDown, ChevronRight, Folder, FileText, LayoutTemplate } from 'lucide-react';
-import { ActiveView } from '../App';
+import { ActiveView } from '../types';
 
 interface SidebarProps {
   books: BookData[];

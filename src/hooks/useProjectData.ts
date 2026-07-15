@@ -1,3 +1,4 @@
+import { exportProjectPDF, exportProjectTXT } from '../lib/exportHelpers';
 import { useState, useEffect } from 'react';
 import { WorkspaceData, ProjectData, createNewProject, Theme } from '../types';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -399,8 +400,36 @@ export function useProjectData() {
     URL.revokeObjectURL(url);
   };
 
+
+  const exportPDF = (project: ProjectData) => exportProjectPDF(project);
+  
+  const exportTXT = (project: ProjectData) => exportProjectTXT(project);
+
+  const exportEPUB = async (project: ProjectData) => {
+    try {
+      const response = await fetch('/api/export/epub', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project)
+      });
+      if (!response.ok) throw new Error('EPUB export failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${project.title.replace(/\s+/g, '_').toLowerCase()}.epub`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch(e) {
+      console.error(e);
+      alert('Failed to generate EPUB');
+    }
+  };
+
   const setTheme = (theme: Theme) => setWorkspace(prev => ({ ...prev, theme }));
   const setActiveProjectId = (id: string | null) => setWorkspace(prev => ({ ...prev, activeProjectId: id }));
 
-  return { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectFile, exportMarkdown, lastSaved, setTheme, setActiveProjectId, syncWithCloud };
+  return { workspace, updateActiveProject, updateProject, addProject, deleteProject, exportProjectJSON, importProjectFile, exportMarkdown, exportPDF, exportTXT, exportEPUB, lastSaved, setTheme, setActiveProjectId, syncWithCloud };
 }

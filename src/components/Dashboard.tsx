@@ -181,9 +181,16 @@ export function Dashboard({ projects, theme, onSelectProject, onAddProject, onDe
                         <button onClick={(e) => handleOpenSettings(project, e)} className={`p-1.5 rounded-md ${ui.highlight}`} title="Project Settings">
                           <Settings className="w-4 h-4" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); onExportProject(project); }} className={`p-1.5 rounded-md ${ui.highlight}`} title="Export JSON">
-                          <Download className="w-4 h-4" />
-                        </button>
+
+                        <div className="relative group/export inline-block" onClick={(e) => e.stopPropagation()}>
+                          <button className={`p-1.5 rounded-md ${ui.highlight}`} title="Export Project">
+                            <Download className="w-4 h-4" />
+                          </button>
+                          <div className={`absolute right-0 top-full mt-1 w-32 rounded-lg shadow-xl border ${ui.panelBorder} ${ui.panelBg} opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all z-50 flex flex-col overflow-hidden`}>
+                            <button onClick={(e) => { e.stopPropagation(); onExportProject(project); }} className={`px-3 py-1.5 text-xs text-left ${ui.hoverBg}`}>JSON</button>
+                          </div>
+                        </div>
+
                         <button onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }} className="p-1.5 rounded-md text-red-500 hover:text-red-600 hover:bg-red-500/10" title="Delete Project">
                           <Trash2 className="w-4 h-4" />
                         </button>

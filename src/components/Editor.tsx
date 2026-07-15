@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Scene, VIBE_COLORS, Theme, THEME_UI, SceneSnapshot, Entity } from '../types';
-import { Play, Square, BookPlus, History, Save, RotateCcw, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote } from 'lucide-react';
+import { Play, Square, BookPlus, History, Save, RotateCcw, Bold, Italic, Heading1, Heading2, List, ListOrdered, Quote, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -8,6 +8,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { BibleEntityNode } from '../extensions/BibleEntityNode';
 import { AutoLinkBible } from '../extensions/AutoLinkBible';
 import { NoLink } from '../extensions/NoLink';
+import Image from '@tiptap/extension-image';
 
 interface EditorProps {
   scene: Scene;
@@ -25,8 +26,42 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
   const [showTooltip, setShowTooltip] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [timeLeft, setTimeLeft] = useState(15 * 60);
+
   const [showSnapshots, setShowSnapshots] = useState(false);
+  const [vibeFeedback, setVibeFeedback] = useState<string | null>(null);
+  const [isCheckingVibe, setIsCheckingVibe] = useState(false);
+
+
+  const handleVibeCheck = async () => {
+    setIsCheckingVibe(true);
+    setVibeFeedback(null);
+    try {
+      const text = editor?.getText() || '';
+      const response = await fetch('/api/gemini/vibe-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, vibe: scene.vibe, bible })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setVibeFeedback(data.feedback);
+      } else {
+        const data = await response.json();
+        setVibeFeedback("Error: " + (data.error || "Failed to check vibe"));
+      }
+    } catch (e: any) {
+      setVibeFeedback("Error: " + e.message);
+    }
+    setIsCheckingVibe(false);
+    
+    // Auto-hide feedback after 10 seconds
+    setTimeout(() => {
+      setVibeFeedback(null);
+    }, 10000);
+  };
+
   const bibleRef = useRef(bible);
+
 
   
   useEffect(() => { bibleRef.current = bible; }, [bible]);
@@ -48,6 +83,7 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
 
   const editor = useEditor({
     extensions: [
+      Image,
       StarterKit,
       Placeholder.configure({
         placeholder: isTrashDraftMode ? "Just write. No looking back..." : placeholderPrompt,
@@ -168,7 +204,11 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
   };
 
   const strippedContent = scene.content.replace(/<[^>]+>/g, '');
-  const wordCount = strippedContent.trim() ? strippedContent.trim().split(/\s+/).length : 0;
+  const words = strippedContent.trim() ? strippedContent.trim().split(/\s+/) : [];
+  const wordCount = words.length;
+  const sentences = strippedContent.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
+  const avgSentenceLength = sentences > 0 ? Math.round(wordCount / sentences) : 0;
+  const readingTimeMin = Math.ceil(wordCount / 200);
 
   return (
     <div className="flex-1 flex flex-col h-full relative">
@@ -273,6 +313,13 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
           >
             <Quote className={`w-4 h-4 ${colors.text}`} />
           </button>
+          <button
+            onClick={() => { const url = window.prompt("URL"); if (url) { editor.chain().focus().setImage({ src: url }).run() } }}
+            className={`p-1.5 rounded hover:bg-black/10`}
+            title="Insert Image"
+          >
+            <ImageIcon className={`w-4 h-4 ${colors.text}`} />
+          </button>
         </div>
       )}
 
@@ -306,6 +353,8 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
       <div className={`px-6 py-2 border-t flex justify-between items-center text-xs transition-colors duration-700 ${colors.border} ${colors.text} opacity-60 z-10 shrink-0 relative`}>
         <div className="flex items-center gap-4">
           <span className="font-mono tracking-tight">{wordCount} words</span>
+          <span className="font-mono tracking-tight border-l pl-4 border-current opacity-70" title="Average Sentence Length">{avgSentenceLength} words/sentence</span>
+          <span className="font-mono tracking-tight border-l pl-4 border-current opacity-70" title="Estimated Reading Time">~{readingTimeMin} min read</span>
           {scene.wordGoal && (
             <span className="flex items-center gap-2 font-mono tracking-tight">
               Goal: {scene.wordGoal} 
@@ -320,9 +369,33 @@ export function Editor({ scene, updateScene, onAddToBible, isTrashDraftMode, set
           )}
         </div>
         <div className="flex items-center gap-4">
+
+          <div className="relative">
+            <button
+              onClick={handleVibeCheck}
+              disabled={isCheckingVibe}
+              className={`flex items-center gap-1.5 hover:opacity-100 ${isCheckingVibe ? 'opacity-50' : 'opacity-80'} transition-opacity`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isCheckingVibe ? 'animate-pulse text-indigo-400' : ''}`} />
+              Vibe Check
+            </button>
+            <AnimatePresence>
+              {vibeFeedback && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className={`absolute bottom-full right-0 mb-2 w-64 rounded-lg shadow-xl border ${ui.panelBorder} ${ui.panelBg} ${ui.textMain} p-3 text-xs leading-relaxed z-50`}
+                >
+                  <p className="opacity-90">{vibeFeedback}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <div className="relative">
             <button
               onClick={() => setShowSnapshots(!showSnapshots)}
+
               className="flex items-center gap-1.5 hover:opacity-100 opacity-80 transition-opacity"
             >
               <History className="w-3.5 h-3.5" />
